@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.idea/
+.DS_Store
+*.user
+*.suo
+TestResults/
+appsettings.Development.json
+secrets.json
+appsettings.Development.json
+.vscode/

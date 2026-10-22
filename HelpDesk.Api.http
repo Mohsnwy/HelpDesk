@@ -1,0 +1,38 @@
+@HelpDesk.Api_HostAddress = http://localhost:5091
+
+GET {{HelpDesk.Api_HostAddress}}/api/tickets
+Accept: application/json
+
+###
+
+GET {{HelpDesk.Api_HostAddress}}/api/tickets/1
+Accept: application/json
+
+###
+
+POST {{HelpDesk.Api_HostAddress}}/api/tickets
+Content-Type: application/json
+
+{
+  "title": "VPN connection issue",
+  "description": "Unable to connect to the company VPN.",
+  "priority": "High",
+  "categoryId": 1
+}
+
+###
+
+PUT {{HelpDesk.Api_HostAddress}}/api/tickets/1
+Content-Type: application/json
+
+{
+  "title": "Laptop won't start",
+  "description": "The laptop does not turn on.",
+  "priority": "High",
+  "status": "InProgress",
+  "categoryId": 1
+}
+
+###
+
+DELETE {{HelpDesk.Api_HostAddress}}/api/tickets/2
