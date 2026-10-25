@@ -47,7 +47,7 @@ dotnet test HelpDesk.sln
 dotnet run --project HelpDesk.Api.csproj
 ```
 
-Swagger UI and the generated OpenAPI document are available in Development at `/swagger` and `/openapi/v1.json`. If Docker is unavailable, the PostgreSQL integration test reports a skip reason in test output; the workflow unit tests still run.
+Swagger UI and the generated OpenAPI document are available in Development at `/swagger` and `/openapi/v1.json`. PostgreSQL Testcontainers tests use `postgres:17`, matching the documented development database. If Docker is unavailable, xUnit marks the affected tests as **Skipped** with the reason; unit and validation tests still run. Tests cover ticket workflow rules, TicketService create/read behavior, request validation, RFC 7807 exception responses, and the ticket CRUD HTTP pipeline. Stages 1–5 are the committed baseline; this branch adds the pre-Stage-6 test catch-up.
 
 ## Ticket routes
 

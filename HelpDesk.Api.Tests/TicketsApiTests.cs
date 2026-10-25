@@ -9,11 +9,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using DotNet.Testcontainers.Builders;
 using Testcontainers.PostgreSql;
-using Xunit.Abstractions;
 
 namespace HelpDesk.Api.Tests;
 
-public class TicketsApiTests(ITestOutputHelper output)
+public class TicketsApiTests
 {
     [Fact]
     public async Task Crud_endpoints_work_against_postgresql()
@@ -21,14 +20,13 @@ public class TicketsApiTests(ITestOutputHelper output)
         PostgreSqlContainer postgres;
         try
         {
-            postgres = new PostgreSqlBuilder().Build();
+            postgres = new PostgreSqlBuilder().WithImage("postgres:17").Build();
             await postgres.StartAsync();
         }
         catch (DockerUnavailableException exception)
         {
             var reason = $"PostgreSQL integration test needs a working Docker daemon. {exception.Message}";
-            output.WriteLine($"SKIPPED: {reason}");
-            return;
+            throw Xunit.Sdk.SkipException.ForSkip(reason);
         }
 
         await using var container = postgres;

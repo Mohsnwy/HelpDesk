@@ -10,14 +10,13 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         if (exception is TicketInputException inputException)
         {
             httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-            httpContext.Response.ContentType = "application/problem+json";
             await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Invalid ticket input.",
                 Detail = inputException.Message,
                 Instance = httpContext.Request.Path
-            }, cancellationToken);
+            }, options: null, contentType: "application/problem+json", cancellationToken);
             return true;
         }
 
@@ -25,13 +24,12 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             httpContext.Request.Method, httpContext.Request.Path);
 
         httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        httpContext.Response.ContentType = "application/problem+json";
         await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
         {
             Status = StatusCodes.Status500InternalServerError,
             Title = "An unexpected error occurred.",
             Instance = httpContext.Request.Path
-        }, cancellationToken);
+        }, options: null, contentType: "application/problem+json", cancellationToken);
 
         return true;
     }
