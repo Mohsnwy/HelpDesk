@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <DefaultItemExcludes>$(DefaultItemExcludes);HelpDesk.Api.Tests/**</DefaultItemExcludes>
     <UserSecretsId>53598450-4bd2-4b94-ae7c-3f94b964baa3</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

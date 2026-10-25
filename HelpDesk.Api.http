@@ -5,6 +5,11 @@ Accept: application/json
 
 ###
 
+GET {{HelpDesk.Api_HostAddress}}/api/tickets?status=Open&priority=High&search=VPN&sortBy=createdAt&sortDirection=desc&page=1&pageSize=20
+Accept: application/json
+
+###
+
 GET {{HelpDesk.Api_HostAddress}}/api/tickets/1
 Accept: application/json
 
@@ -36,3 +41,23 @@ Content-Type: application/json
 ###
 
 DELETE {{HelpDesk.Api_HostAddress}}/api/tickets/2
+
+###
+
+POST {{HelpDesk.Api_HostAddress}}/api/tickets/1/comments
+Content-Type: application/json
+
+{
+  "authorId": 2,
+  "body": "Investigating the issue.",
+  "isInternal": true
+}
+
+###
+
+PUT {{HelpDesk.Api_HostAddress}}/api/tickets/1/assignment
+Content-Type: application/json
+
+{
+  "assigneeId": 2
+}

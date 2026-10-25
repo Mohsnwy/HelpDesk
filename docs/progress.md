@@ -42,7 +42,13 @@
 
 ## Stage 6 — Comments and API usability
 
-- Pending: comments, assignment, filtering, sorting, pagination, OpenAPI descriptions, and tests.
+- Added comment list/create routes with `IsInternal`, active author validation, required body validation, and stable chronological ordering.
+- Added assignment/unassignment; only active Agent/Admin users are accepted as assignees.
+- Added combined status, priority, category, requester, assignee, date-range, and case-insensitive text filters; allow-listed stable sorting; page metadata; and page-size/page-number/filter validation.
+- Added endpoint summaries, remarks, response metadata, request examples, and documented current unauthenticated limitations.
+- Added PostgreSQL HTTP integration coverage for comments, assignment, filtering, sorting, pagination, invalid bounds, empty results, and invalid comment/assignee inputs.
+- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
+- `dotnet test HelpDesk.sln --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; the PostgreSQL 17 Testcontainers integration test ran successfully.
 
 ## Remaining roadmap
 
