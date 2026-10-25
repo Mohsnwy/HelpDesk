@@ -68,6 +68,13 @@ A stage is complete only when:
 3. README and `docs/progress.md` reflect the stage.
 4. The stage is committed.
 
+- Tests that cannot run in the current environment (e.g. Docker unavailable) must be marked
+  as **Skipped** using the test framework's skip mechanism, never return early and pass.
+  The report must state passed, failed and skipped counts separately.
+- New services, middleware, and validation logic require tests in the same stage; do not defer.
+- If the workspace is not a Git repository, report it as a blocker in the first message
+  instead of continuing without version control.
+- Work on the current feature branch only. Never commit to or merge into `main`.
 ## Project context
 
 - Project: `HelpDesk.Api`
