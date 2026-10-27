@@ -67,7 +67,8 @@
 - Protected lookup reads for authenticated users and lookup writes for Admin. Added Swagger bearer authorization and updated the `.http` examples and README bootstrap/login instructions.
 - Added integration coverage for login success/failure, 401/403, user creation/profile, token validation, ownership, identity spoofing, and internal-comment visibility.
 - `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
-- `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; PostgreSQL 17 Testcontainers ran successfully.
+- A follow-up test commit adds six separately reported Stage 7/8 PostgreSQL API tests and two unit tests for password hashing and JWT signing/claims/expiry. The integration tests each use an isolated PostgreSQL 17 Testcontainer and known seed state.
+- `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 21 passed, 0 failed, 0 skipped; PostgreSQL 17 Testcontainers ran successfully.
 
 ## Remaining roadmap
 

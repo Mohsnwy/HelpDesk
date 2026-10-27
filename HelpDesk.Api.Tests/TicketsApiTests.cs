@@ -14,6 +14,7 @@ using Testcontainers.PostgreSql;
 
 namespace HelpDesk.Api.Tests;
 
+[Collection(StageApiIntegrationCollection.Name)]
 public class TicketsApiTests
 {
     [Fact]

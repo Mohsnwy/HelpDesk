@@ -43,7 +43,7 @@ dotnet test HelpDesk.sln
 dotnet run --project HelpDesk.Api.csproj
 ```
 
-Swagger is available in Development at `/swagger`; the OpenAPI JSON is at `/openapi/v1.json`. The PostgreSQL integration tests use Testcontainers and report a framework skipped result when Docker is unavailable.
+Swagger is available in Development at `/swagger`; the OpenAPI JSON is at `/openapi/v1.json`. The PostgreSQL integration tests use Testcontainers and report a framework skipped result when Docker is unavailable. The suite includes separate authentication/authorization integration tests, plus unit tests for password hashing and JWT signing, claims, and expiry.
 
 ## Create the first admin and log in
 
