@@ -50,6 +50,15 @@
 - `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
 - `dotnet test HelpDesk.sln --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; the PostgreSQL 17 Testcontainers integration test ran successfully.
 
+## Stage 7 — Users and departments
+
+- Added sorted category and department list endpoints and creation endpoints, plus user profile/admin-creation route scaffolding and credential-free user response DTOs.
+- Added the required user password-hash column and EF migration; passwords will be hashed with `PasswordHasher<User>` as part of Stage 8.
+- Kept categories and departments as lookup entities because ticket and employee records reference them relationally.
+- Added PostgreSQL HTTP coverage for lookup reads, creates, and request validation.
+- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
+- `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; PostgreSQL Testcontainers ran successfully.
+
 ## Remaining roadmap
 
 - Stage 7: category/department endpoints and user profile support.

@@ -47,6 +47,19 @@ public class TicketsApiTests
                 await db.SaveChangesAsync();
             }
 
+            var departments = await client.GetFromJsonAsync<List<Department>>("/api/departments");
+            Assert.NotNull(departments);
+            Assert.Contains(departments, department => department.Name == "Engineering");
+            var newDepartment = await client.PostAsJsonAsync("/api/departments", new { name = "Customer Success" });
+            Assert.Equal(HttpStatusCode.Created, newDepartment.StatusCode);
+            var categories = await client.GetFromJsonAsync<List<Category>>("/api/categories");
+            Assert.NotNull(categories);
+            Assert.Contains(categories, category => category.Name == "IT Support");
+            var newCategory = await client.PostAsJsonAsync("/api/categories", new { name = "Payroll" });
+            Assert.Equal(HttpStatusCode.Created, newCategory.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest,
+                (await client.PostAsJsonAsync("/api/categories", new { name = " " })).StatusCode);
+
             var invalidResponse = await client.PostAsJsonAsync("/api/tickets", new
             {
                 title = " ",

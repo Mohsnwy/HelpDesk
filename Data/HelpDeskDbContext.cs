@@ -17,6 +17,7 @@ public class HelpDeskDbContext(DbContextOptions<HelpDeskDbContext> options) : Db
         {
             entity.Property(user => user.FullName).HasMaxLength(200).IsRequired();
             entity.Property(user => user.Email).HasMaxLength(320).IsRequired();
+            entity.Property(user => user.PasswordHash).HasMaxLength(512).IsRequired();
             entity.HasIndex(user => user.Email).IsUnique();
             entity.Property(user => user.Role).HasConversion<string>().HasMaxLength(32);
             entity.HasOne(user => user.Department).WithMany(department => department.Users)

@@ -51,7 +51,7 @@ Swagger UI and the generated OpenAPI document are available in Development at `/
 
 ## Ticket routes
 
-All routes are currently unauthenticated. Ticket IDs and timestamps are server generated. Enum values are represented as strings in JSON.
+Authentication and role restrictions are being added in Stage 8. Lookup routes are present; the ticket API remains temporarily unauthenticated until Stage 8 completes. Ticket IDs and timestamps are server generated. Enum values are represented as strings in JSON.
 
 | Method | Route | Behavior |
 |---|---|---|
@@ -63,6 +63,10 @@ All routes are currently unauthenticated. Ticket IDs and timestamps are server g
 | GET | `/api/tickets/{id}/comments` | List comments in creation order; `404` if the ticket is missing |
 | POST | `/api/tickets/{id}/comments` | Add a comment or internal note; `201`, `400`, or `404` |
 | PUT | `/api/tickets/{id}/assignment` | Assign to an active agent/admin or send `assigneeId: null` to unassign |
+| GET | `/api/departments` | List departments |
+| POST | `/api/departments` | Create a department (Admin authorization is added in Stage 8) |
+| GET | `/api/categories` | List ticket categories |
+| POST | `/api/categories` | Create a category (Admin authorization is added in Stage 8) |
 
 `GET /api/tickets` accepts `status`, `priority`, `categoryId`, `requesterId`, `assigneeId`, `createdFrom`, `createdTo`, and `search` filters. Sort with `sortBy=id|title|status|priority|createdAt|updatedAt` and `sortDirection=asc|desc`. Pagination defaults to `page=1&pageSize=20`; page size is capped at 100. The response includes `items`, `page`, `pageSize`, `totalCount`, and `totalPages`. Invalid filters, sort values, dates, or page bounds return `400` Problem Details.
 
@@ -113,3 +117,8 @@ Assign a ticket with `PUT /api/tickets/{id}/assignment` and `{"assigneeId": 2}`.
 - Comment author IDs are temporary request fields because authentication does not exist yet. The API stores and returns `IsInternal`, but does not hide internal notes until Stage 8 authorization.
 - Assignment accepts only active agents/admins and supports clearing the nullable assignee. Role-based access restrictions remain pending authentication.
 - Swagger XML summaries and endpoint response metadata describe the current routes; request examples are in this README and `HelpDesk.Api.http`.
+
+### Stage 7 design decisions
+
+- Categories and departments remain relational lookup tables because tickets and users reference them by foreign key. Reads and creation endpoints return sorted lookup data; Stage 8 applies authentication and reserves writes for Admin.
+- User profiles use a response DTO that omits password credentials. The database now has a password hash column in preparation for Stage 8; authentication will store only `PasswordHasher<User>` hashes.

@@ -16,6 +16,7 @@ public class User
     public Department? Department { get; set; }
     public UserRole Role { get; set; } = UserRole.Employee;
     public bool IsActive { get; set; } = true;
+    public string PasswordHash { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<Ticket> RequestedTickets { get; set; } = new List<Ticket>();
     public ICollection<Ticket> AssignedTickets { get; set; } = new List<Ticket>();
