@@ -65,13 +65,16 @@ public class Stage5CatchUpTests
         var options = new DbContextOptionsBuilder<HelpDeskDbContext>().UseNpgsql(postgres.GetConnectionString()).Options;
         await using var db = new HelpDeskDbContext(options);
         await db.Database.EnsureCreatedAsync();
+        var requester = new User { FullName = "Unit Test Employee", Email = "unit@example.test" };
+        db.Users.Add(requester);
+        await db.SaveChangesAsync();
         var service = new TicketService(db);
         var created = await service.CreateAsync(new CreateTicketRequest
         {
             Title = "  Printer issue  ", Description = "  Paper jam  ", Priority = TicketPriority.High
-        }, default);
+        }, requester.Id, default);
 
-        var found = await service.GetByIdAsync(created.Id, default);
+        var found = await service.GetByIdAsync(created.Id, requester.Id, default);
         Assert.NotNull(found);
         Assert.Equal("Printer issue", found.Title);
         Assert.Equal("Paper jam", found.Description);

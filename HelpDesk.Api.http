@@ -1,63 +1,91 @@
 @HelpDesk.Api_HostAddress = http://localhost:5091
+@token = paste-access-token-from-login-here
 
-GET {{HelpDesk.Api_HostAddress}}/api/tickets
+### Login, then copy accessToken into @token above
+POST {{HelpDesk.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@company.example",
+  "password": "your-local-admin-password"
+}
+
+### Current user profile
+GET {{HelpDesk.Api_HostAddress}}/api/users/me
+Authorization: Bearer {{token}}
 Accept: application/json
 
-###
-
+### List tickets
 GET {{HelpDesk.Api_HostAddress}}/api/tickets?status=Open&priority=High&search=VPN&sortBy=createdAt&sortDirection=desc&page=1&pageSize=20
+Authorization: Bearer {{token}}
 Accept: application/json
 
-###
-
-GET {{HelpDesk.Api_HostAddress}}/api/tickets/1
-Accept: application/json
-
-###
-
+### Create a ticket (requesterId is ignored; requester comes from the token)
 POST {{HelpDesk.Api_HostAddress}}/api/tickets
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "title": "VPN connection issue",
   "description": "Unable to connect to the company VPN.",
   "priority": "High",
-  "categoryId": 1
+  "categoryId": 1,
+  "requesterId": 999
 }
 
-###
+### Get a ticket
+GET {{HelpDesk.Api_HostAddress}}/api/tickets/1
+Authorization: Bearer {{token}}
+Accept: application/json
 
+### Update a ticket
 PUT {{HelpDesk.Api_HostAddress}}/api/tickets/1
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "title": "Laptop won't start",
-  "description": "The laptop does not turn on.",
+  "title": "VPN connection issue",
+  "description": "Unable to connect to the company VPN.",
   "priority": "High",
   "status": "InProgress",
   "categoryId": 1
 }
 
-###
-
-DELETE {{HelpDesk.Api_HostAddress}}/api/tickets/2
-
-###
-
+### Add a public comment (authorId is taken from the token)
 POST {{HelpDesk.Api_HostAddress}}/api/tickets/1/comments
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "authorId": 2,
   "body": "Investigating the issue.",
+  "isInternal": false
+}
+
+### Add an internal note (Agent/Admin only)
+POST {{HelpDesk.Api_HostAddress}}/api/tickets/1/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "body": "Checking internal service logs.",
   "isInternal": true
 }
 
-###
-
+### Assign a ticket (Agent/Admin only)
 PUT {{HelpDesk.Api_HostAddress}}/api/tickets/1/assignment
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "assigneeId": 2
 }
+
+### List categories
+GET {{HelpDesk.Api_HostAddress}}/api/categories
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### List departments
+GET {{HelpDesk.Api_HostAddress}}/api/departments
+Authorization: Bearer {{token}}
+Accept: application/json

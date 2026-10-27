@@ -6,10 +6,11 @@ namespace HelpDesk.Api.Services;
 
 public class TicketService(HelpDeskDbContext dbContext) : ITicketService
 {
-    public async Task<PagedResult<TicketResponse>> GetAllAsync(TicketQuery query, CancellationToken cancellationToken)
+    public async Task<PagedResult<TicketResponse>> GetAllAsync(TicketQuery query, int? requesterId, CancellationToken cancellationToken)
     {
         ValidateQuery(query);
         IQueryable<Ticket> tickets = dbContext.Tickets.AsNoTracking();
+        if (requesterId is not null) tickets = tickets.Where(ticket => ticket.RequesterId == requesterId);
         if (query.Status is not null) tickets = tickets.Where(ticket => ticket.Status == query.Status);
         if (query.Priority is not null) tickets = tickets.Where(ticket => ticket.Priority == query.Priority);
         if (query.CategoryId is not null) tickets = tickets.Where(ticket => ticket.CategoryId == query.CategoryId);
@@ -41,13 +42,13 @@ public class TicketService(HelpDeskDbContext dbContext) : ITicketService
             (int)Math.Ceiling(totalCount / (double)query.PageSize));
     }
 
-    public async Task<TicketResponse?> GetByIdAsync(int id, CancellationToken cancellationToken)
+    public async Task<TicketResponse?> GetByIdAsync(int id, int? requesterId, CancellationToken cancellationToken)
     {
-        var ticket = await dbContext.Tickets.AsNoTracking().SingleOrDefaultAsync(ticket => ticket.Id == id, cancellationToken);
+        var ticket = await dbContext.Tickets.AsNoTracking().SingleOrDefaultAsync(ticket => ticket.Id == id && (requesterId == null || ticket.RequesterId == requesterId), cancellationToken);
         return ticket is null ? null : ToResponse(ticket);
     }
 
-    public async Task<TicketResponse> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken)
+    public async Task<TicketResponse> CreateAsync(CreateTicketRequest request, int requesterId, CancellationToken cancellationToken)
     {
         await ValidateCategoryAsync(request.CategoryId, cancellationToken);
         var now = DateTime.UtcNow;
@@ -57,6 +58,7 @@ public class TicketService(HelpDeskDbContext dbContext) : ITicketService
             Description = request.Description.Trim(),
             Priority = request.Priority,
             CategoryId = request.CategoryId,
+            RequesterId = requesterId,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -65,9 +67,9 @@ public class TicketService(HelpDeskDbContext dbContext) : ITicketService
         return ToResponse(ticket);
     }
 
-    public async Task<(TicketResponse? Ticket, bool InvalidTransition)> UpdateAsync(int id, UpdateTicketRequest request, CancellationToken cancellationToken)
+    public async Task<(TicketResponse? Ticket, bool InvalidTransition)> UpdateAsync(int id, UpdateTicketRequest request, int? requesterId, CancellationToken cancellationToken)
     {
-        var ticket = await dbContext.Tickets.SingleOrDefaultAsync(ticket => ticket.Id == id, cancellationToken);
+        var ticket = await dbContext.Tickets.SingleOrDefaultAsync(ticket => ticket.Id == id && (requesterId == null || ticket.RequesterId == requesterId), cancellationToken);
         if (ticket is null) return (null, false);
         if (ticket.Status != request.Status && !TicketWorkflow.CanTransition(ticket.Status, request.Status))
             return (null, true);
@@ -95,25 +97,27 @@ public class TicketService(HelpDeskDbContext dbContext) : ITicketService
         return true;
     }
 
-    public async Task<IReadOnlyList<TicketCommentResponse>?> GetCommentsAsync(int ticketId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TicketCommentResponse>?> GetCommentsAsync(int ticketId, int? requesterId, bool includeInternal, CancellationToken cancellationToken)
     {
-        if (!await dbContext.Tickets.AnyAsync(ticket => ticket.Id == ticketId, cancellationToken)) return null;
-        return await dbContext.TicketComments.AsNoTracking().Where(comment => comment.TicketId == ticketId)
+        if (!await dbContext.Tickets.AnyAsync(ticket => ticket.Id == ticketId && (requesterId == null || ticket.RequesterId == requesterId), cancellationToken)) return null;
+        var comments = dbContext.TicketComments.AsNoTracking().Where(comment => comment.TicketId == ticketId);
+        if (!includeInternal) comments = comments.Where(comment => !comment.IsInternal);
+        return await comments
             .OrderBy(comment => comment.CreatedAt).ThenBy(comment => comment.Id)
             .Select(comment => new TicketCommentResponse(comment.Id, comment.TicketId, comment.AuthorId, comment.Body, comment.IsInternal, comment.CreatedAt))
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TicketCommentResponse?> AddCommentAsync(int ticketId, TicketCommentRequest request, CancellationToken cancellationToken)
+    public async Task<TicketCommentResponse?> AddCommentAsync(int ticketId, int authorId, int? requesterId, TicketCommentRequest request, CancellationToken cancellationToken)
     {
-        if (!await dbContext.Tickets.AnyAsync(ticket => ticket.Id == ticketId, cancellationToken)) return null;
+        if (!await dbContext.Tickets.AnyAsync(ticket => ticket.Id == ticketId && (requesterId == null || ticket.RequesterId == requesterId), cancellationToken)) return null;
         if (string.IsNullOrWhiteSpace(request.Body)) throw new TicketInputException("Comment body is required.");
-        if (!await dbContext.Users.AnyAsync(user => user.Id == request.AuthorId && user.IsActive, cancellationToken))
-            throw new TicketInputException($"Active author {request.AuthorId} does not exist.");
+        if (!await dbContext.Users.AnyAsync(user => user.Id == authorId && user.IsActive, cancellationToken))
+            throw new TicketInputException("Authenticated comment author is inactive or missing.");
         var comment = new TicketComment
         {
             TicketId = ticketId,
-            AuthorId = request.AuthorId,
+            AuthorId = authorId,
             Body = request.Body.Trim(),
             IsInternal = request.IsInternal,
             CreatedAt = DateTime.UtcNow

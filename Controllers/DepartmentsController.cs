@@ -1,11 +1,12 @@
 using HelpDesk.Api.Data;
 using HelpDesk.Api.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace HelpDesk.Api.Controllers;
 
-[ApiController, Route("api/departments")]
+[ApiController, Route("api/departments"), Authorize]
 public sealed class DepartmentsController(HelpDeskDbContext db) : ControllerBase
 {
     [HttpGet]
@@ -13,6 +14,7 @@ public sealed class DepartmentsController(HelpDeskDbContext db) : ControllerBase
         Ok(await db.Departments.AsNoTracking().OrderBy(x => x.Name).ToListAsync(ct));
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<Department>> Create(CreateLookupRequest request, CancellationToken ct)
     {
         var department = new Department { Name = request.Name.Trim() };

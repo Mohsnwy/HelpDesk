@@ -1,44 +1,40 @@
 # HelpDesk.Api
 
-An ASP.NET Core REST API for managing internal employee support tickets. The project currently provides ticket CRUD, PostgreSQL persistence, validation, and a centralized ticket status workflow.
+An ASP.NET Core REST API for internal employee support tickets, backed by PostgreSQL and EF Core. It includes ticket workflows, filtering, comments, assignment, JWT authentication, and role based access.
 
-## Requirements
+## Requirements and setup
 
 - .NET 10 SDK
 - PostgreSQL 16 or newer
-- Docker (for the PostgreSQL integration test)
+- Docker for PostgreSQL integration tests
 
-Start a local database with:
+Start a local database:
 
 ```sh
 docker run --name helpdesk-postgres -e POSTGRES_DB=helpdesk -e POSTGRES_USER=helpdesk -e POSTGRES_PASSWORD=local-development-only -p 5432:5432 -d postgres:17-alpine
 ```
 
-Set the connection string before starting the API. Do not commit real credentials.
+Configure the database connection and signing key. The JWT key must be at least 32 UTF-8 bytes; it is required at startup in every environment except automated tests.
 
 ```sh
 export ConnectionStrings__HelpDesk='Host=localhost;Port=5432;Database=helpdesk;Username=helpdesk;Password=local-development-only'
+export Jwt__SigningKey="$(openssl rand -base64 48)"
 ```
 
-## Database setup
+Or use .NET user-secrets for local development:
 
-The repository includes a local `dotnet-ef` tool manifest. After restoring tools and packages, create/update the database using EF migrations:
+```sh
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)"
+```
+
+The API does not automatically alter the database at startup. Apply migrations with:
 
 ```sh
 dotnet tool restore
 dotnet ef database update
 ```
 
-To change the schema, create a migration and commit its generated files:
-
-```sh
-dotnet ef migrations add DescribeYourChange
-dotnet ef database update
-```
-
-The API does not automatically alter a database at startup. Development example configuration is in `appsettings.Development.example.json`; set local configuration with environment variables or .NET user secrets.
-
-## Run and test
+Run and verify:
 
 ```sh
 dotnet restore HelpDesk.sln
@@ -47,36 +43,45 @@ dotnet test HelpDesk.sln
 dotnet run --project HelpDesk.Api.csproj
 ```
 
-Swagger UI and the generated OpenAPI document are available in Development at `/swagger` and `/openapi/v1.json`. PostgreSQL Testcontainers tests use `postgres:17`, matching the documented development database. If Docker is unavailable, xUnit marks the affected tests as **Skipped** with the reason; unit and validation tests still run. Tests cover ticket workflow rules, TicketService create/read behavior, request validation, RFC 7807 exception responses, and the ticket CRUD HTTP pipeline. Stages 1–5 are the committed baseline; this branch adds the pre-Stage-6 test catch-up.
+Swagger is available in Development at `/swagger`; the OpenAPI JSON is at `/openapi/v1.json`. The PostgreSQL integration tests use Testcontainers and report a framework skipped result when Docker is unavailable.
 
-## Ticket routes
+## Create the first admin and log in
 
-Authentication and role restrictions are being added in Stage 8. Lookup routes are present; the ticket API remains temporarily unauthenticated until Stage 8 completes. Ticket IDs and timestamps are server generated. Enum values are represented as strings in JSON.
+The initial admin bootstrap runs only in Development. After applying migrations, configure these values through user-secrets (or the corresponding `BootstrapAdmin__...` environment variables):
 
-| Method | Route | Behavior |
-|---|---|---|
-| GET | `/api/tickets` | Filtered, sorted, paginated ticket list |
-| GET | `/api/tickets/{id}` | Get a ticket; `404` if missing |
-| POST | `/api/tickets` | Create a ticket; `201` with a `Location` header |
-| PUT | `/api/tickets/{id}` | Update fields and transition status; `404` if missing, `409` for an invalid transition |
-| DELETE | `/api/tickets/{id}` | Delete a ticket; `204` or `404` |
-| GET | `/api/tickets/{id}/comments` | List comments in creation order; `404` if the ticket is missing |
-| POST | `/api/tickets/{id}/comments` | Add a comment or internal note; `201`, `400`, or `404` |
-| PUT | `/api/tickets/{id}/assignment` | Assign to an active agent/admin or send `assigneeId: null` to unassign |
-| GET | `/api/departments` | List departments |
-| POST | `/api/departments` | Create a department (Admin authorization is added in Stage 8) |
-| GET | `/api/categories` | List ticket categories |
-| POST | `/api/categories` | Create a category (Admin authorization is added in Stage 8) |
-
-`GET /api/tickets` accepts `status`, `priority`, `categoryId`, `requesterId`, `assigneeId`, `createdFrom`, `createdTo`, and `search` filters. Sort with `sortBy=id|title|status|priority|createdAt|updatedAt` and `sortDirection=asc|desc`. Pagination defaults to `page=1&pageSize=20`; page size is capped at 100. The response includes `items`, `page`, `pageSize`, `totalCount`, and `totalPages`. Invalid filters, sort values, dates, or page bounds return `400` Problem Details.
-
-Example filtered page:
-
-```http
-GET /api/tickets?status=Open&priority=High&search=VPN&sortBy=createdAt&sortDirection=desc&page=1&pageSize=20
+```sh
+dotnet user-secrets set "BootstrapAdmin:Email" "admin@company.example"
+dotnet user-secrets set "BootstrapAdmin:FullName" "Help Desk Administrator"
+dotnet user-secrets set "BootstrapAdmin:Password" "use-a-unique-password-at-least-12-chars"
+dotnet run
 ```
 
-Example create request:
+It creates the configured account only if that email is not already present. Remove the bootstrap password from local configuration after first startup. Additional users are created by an Admin using `POST /api/users`; public self-registration is not available. Passwords are stored as `PasswordHasher<User>` hashes.
+
+In Swagger, submit `POST /api/auth/login` with the admin email and password. Copy `accessToken` from the response, click **Authorize**, paste the token without the `Bearer ` prefix, and authorize. Swagger supplies the bearer scheme for protected requests. Tokens expire after 60 minutes.
+
+## Roles and routes
+
+Employees can create, view, update, and comment on their own tickets. They only see their own tickets; another employee's ticket returns `404`. They cannot assign tickets or create internal notes. Agents can view all tickets, assign tickets, and create/read internal notes. Admins also create users, categories, and departments. All ticket and lookup routes require authentication; `POST /api/auth/login` is anonymous.
+
+| Method | Route | Access / behavior |
+|---|---|---|
+| POST | `/api/auth/login` | Public login; returns a signed JWT |
+| GET | `/api/users/me` | Authenticated profile |
+| POST | `/api/users` | Admin creates a user and assigns a role |
+| GET | `/api/tickets` | Authenticated; Employee sees only own tickets; supports filters and pagination |
+| GET | `/api/tickets/{id}` | Authenticated; `404` for missing or unowned ticket |
+| POST | `/api/tickets` | Authenticated; requester comes from token claims |
+| PUT | `/api/tickets/{id}` | Employee may update own ticket; Agent/Admin may update any |
+| DELETE | `/api/tickets/{id}` | Agent/Admin only |
+| GET/POST | `/api/tickets/{id}/comments` | Authenticated; author comes from claims; Employee never sees internal notes |
+| PUT | `/api/tickets/{id}/assignment` | Agent/Admin only |
+| GET | `/api/categories`, `/api/departments` | Any authenticated user |
+| POST | `/api/categories`, `/api/departments` | Admin only |
+
+`GET /api/tickets` accepts `status`, `priority`, `categoryId`, `requesterId`, `assigneeId`, `createdFrom`, `createdTo`, and `search`. Sort fields are `id|title|status|priority|createdAt|updatedAt`; pagination defaults to `page=1&pageSize=20`, with page size capped at 100. The response includes items and page metadata.
+
+Example ticket creation:
 
 ```json
 {
@@ -87,38 +92,22 @@ Example create request:
 }
 ```
 
-Priorities are `Low`, `Medium`, `High`, and `Critical`. Status transitions are `Open` → `InProgress` → `Resolved` → `Closed`; `Resolved` and `Closed` can transition to `Reopened`, and `Reopened` can transition to `InProgress`. Invalid changes return `409 Conflict`.
-
-Example comment request (until Stage 8, `authorId` and `isInternal` are accepted from the request):
+Example comment request (the server determines the author):
 
 ```json
 {
-  "authorId": 2,
   "body": "I am checking the VPN gateway logs.",
   "isInternal": true
 }
 ```
 
-Assign a ticket with `PUT /api/tickets/{id}/assignment` and `{"assigneeId": 2}`. Send `{"assigneeId": null}` to unassign it. Only active `Agent` or `Admin` users can be assigned. The API is still unauthenticated: internal comment visibility and assignment permissions are not authorization boundaries until Stage 8.
+Only Agent/Admin can set `isInternal` to true. The API ignores extra `requesterId` and `authorId` body fields; they are not part of the request DTOs.
 
-## Design decisions and current limitations
+## Design decisions and limitations
 
-- EF Core maps enums to strings in PostgreSQL for readable persisted values. Category and department are lookup entities, seeded by the initial migration.
-- `TicketWorkflow` is the single place that defines allowed status changes; the service updates resolved and updated timestamps.
-- Controllers return DTOs so generated and persistence fields cannot be supplied by clients.
-- Unexpected exceptions return RFC 7807 `ProblemDetails`; exception details are logged server-side and not returned to clients.
-- The API currently has no authentication/authorization. Requester and assignee are nullable placeholders, so ownership rules are not enforced yet. Do not expose this API to untrusted users or treat it as production-ready.
-- Department/category routes, JWT authentication, authorization policies, Docker Compose, and CI are not implemented yet. See `docs/progress.md` for the roadmap state.
-
-### Stage 6 design decisions
-
-- Ticket lists use a response envelope so clients receive stable page metadata. Filters are combined with AND; text search matches title or description case-insensitively using PostgreSQL `ILIKE`.
-- Sort fields are allow-listed and include an ID tie-breaker for deterministic pages. Page numbers start at 1 and page size is limited to 100.
-- Comment author IDs are temporary request fields because authentication does not exist yet. The API stores and returns `IsInternal`, but does not hide internal notes until Stage 8 authorization.
-- Assignment accepts only active agents/admins and supports clearing the nullable assignee. Role-based access restrictions remain pending authentication.
-- Swagger XML summaries and endpoint response metadata describe the current routes; request examples are in this README and `HelpDesk.Api.http`.
-
-### Stage 7 design decisions
-
-- Categories and departments remain relational lookup tables because tickets and users reference them by foreign key. Reads and creation endpoints return sorted lookup data; Stage 8 applies authentication and reserves writes for Admin.
-- User profiles use a response DTO that omits password credentials. The database now has a password hash column in preparation for Stage 8; authentication will store only `PasswordHasher<User>` hashes.
+- Categories and departments are relational lookup tables referenced by tickets and users.
+- Enums are stored as strings in PostgreSQL for readable persisted values. `TicketWorkflow` centralizes allowed status transitions.
+- Ticket filtering applies ownership in the database query; `404` avoids disclosing another employee's ticket existence. Internal comments are filtered before the Employee response is created.
+- `PasswordHasher<User>` provides password hashing without adding Identity's broader account tables and flows. User creation is Admin-only; Development bootstrap is configured using secrets or environment variables.
+- JWT validation checks issuer, audience, signature, and expiration. Keep the signing key private and rotate it operationally if exposed.
+- The project is not presented as production ready. Docker Compose, CI, key rotation operations, and production admin provisioning remain future work.

@@ -59,6 +59,16 @@
 - `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
 - `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; PostgreSQL Testcontainers ran successfully.
 
+## Stage 8 — Authentication and authorization
+
+- Added JWT bearer login with issuer, audience, signature, and expiry validation; signing key is required and at least 32 bytes outside the test environment.
+- Added PasswordHasher-backed admin user creation, authenticated profile lookup, and Development-only first-admin bootstrap from configuration.
+- Enforced Employee ticket ownership and `404` concealment; hid internal comments from Employees; assigned requester and comment author from JWT identity; restricted assignment and internal notes to Agent/Admin.
+- Protected lookup reads for authenticated users and lookup writes for Admin. Added Swagger bearer authorization and updated the `.http` examples and README bootstrap/login instructions.
+- Added integration coverage for login success/failure, 401/403, user creation/profile, token validation, ownership, identity spoofing, and internal-comment visibility.
+- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
+- `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; PostgreSQL 17 Testcontainers ran successfully.
+
 ## Remaining roadmap
 
 - Stage 7: category/department endpoints and user profile support.

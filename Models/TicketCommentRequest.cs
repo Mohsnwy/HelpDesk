@@ -4,9 +4,6 @@ namespace HelpDesk.Api.Models;
 
 public sealed class TicketCommentRequest
 {
-    [Range(1, int.MaxValue)]
-    public int AuthorId { get; set; }
-
     [Required, StringLength(4000, MinimumLength = 1)]
     public string Body { get; set; } = string.Empty;
 
