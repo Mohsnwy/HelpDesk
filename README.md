@@ -1,140 +1,102 @@
 # HelpDesk.Api
 
-HelpDesk.Api is an internal company help desk REST API built with ASP.NET Core 10, EF Core, and PostgreSQL 17. Employees raise and track IT, HR, facilities, and access requests; support staff triage, assign, comment on, and resolve them.
+![CI](https://github.com/Mohsnwy/HelpDesk/actions/workflows/ci.yml/badge.svg)
 
-## Domain and roles
+An internal company help desk REST API built with ASP.NET Core 10, EF Core and PostgreSQL 17. Employees raise tickets (IT, HR, facilities, access); support staff assign, comment on and resolve them.
 
-- **Employee:** create and manage their own tickets and comments. Other employees' tickets are concealed with `404`; internal agent notes are never returned.
-- **Agent:** view and manage tickets across employees, assign tickets, and create/read internal notes.
-- **Admin:** all Agent capabilities plus manage users, categories, and departments.
+**Features:** JWT login with roles (Employee, Agent, Admin), ticket ownership rules, status workflow, comments with agent-only internal notes, filtering and pagination, Docker Compose, and integration tests on real PostgreSQL.
 
-Tickets have `Open`, `InProgress`, `Resolved`, `Closed`, and `Reopened` statuses and `Low`, `Medium`, `High`, or `Critical` priorities. Ticket status transitions are centralized in `TicketWorkflow`. Users, tickets, comments, categories, and departments are persisted with EF Core and PostgreSQL.
 
-## Architecture
+![Swagger UI](docs/images/Swagger-overview.png)
 
-Controllers handle HTTP concerns; `ITicketService`/`TicketService` encapsulate ticket persistence and mapping; `HelpDeskDbContext` configures relational constraints and string enum storage; `TicketWorkflow` owns transition rules. JWT bearer authentication uses `PasswordHasher<User>` for password hashes. RFC 7807 problem responses are produced by the exception handler. EF migrations are explicit operations and are not applied during API startup.
 
-## Prerequisites
+## Quick start (Docker)
 
-- .NET 10 SDK for local development and migrations.
-- Docker with Compose support for the container stack and PostgreSQL Testcontainers integration tests.
-- PostgreSQL 17 when running the API outside Compose.
+1. Copy the example config and edit three values in `.env`: `POSTGRES_PASSWORD`, `JWT_SIGNING_KEY` (at least 32 characters, e.g. `openssl rand -base64 48`) and `BOOTSTRAP_ADMIN_PASSWORD` (at least 12 characters).
 
-## Configuration and local setup
+   ```sh
+   cp .env.example .env
+   ```
 
-For Compose, copy the placeholder file and replace every placeholder. The ignored `.env` file holds local credentials and is never committed:
+2. Start the database, apply migrations, then start the API:
 
-```sh
-cp .env.example .env
-```
+   ```sh
+   docker compose up -d db
+   docker compose --profile migration run --rm migrate
+   docker compose up -d --build api
+   ```
 
-Use unique local values for the PostgreSQL password, JWT signing key (at least 32 UTF-8 bytes), and bootstrap admin password (at least 12 characters). The example environment is Development so Swagger and first-admin bootstrap are available locally. Compose defaults to Production if `ASPNETCORE_ENVIRONMENT` is omitted. In a deployed environment, supply secrets through the deployment platform rather than a committed file.
+3. Open Swagger at <http://localhost:8080/swagger>. Call `POST /api/auth/login` with the admin email and password from `.env`, copy the `accessToken`, click **Authorize** and paste only the token.
 
-Start PostgreSQL, then explicitly apply migrations:
+Stop with `docker compose down`. The API never applies migrations on its own, so run the migrate step again after schema changes.
 
-```sh
-docker compose up -d db
-docker compose --profile migration run --rm migrate
-```
+## Roles
 
-Start the API:
+| Role | Can do |
+|---|---|
+| Employee | Create and manage their own tickets and comments. Other people's tickets return `404`. Cannot see internal notes. |
+| Agent | See and manage all tickets, assign them, write internal notes. |
+| Admin | Everything an Agent can do, plus manage users, categories and departments. |
 
-```sh
-docker compose up --build api
-```
+Statuses: `Open`, `InProgress`, `Resolved`, `Closed`, `Reopened`. Priorities: `Low`, `Medium`, `High`, `Critical`.
 
-The API listens at `http://localhost:${API_PORT:-8080}`. In Development, Swagger UI is at `/swagger`. The API does not migrate the database at startup. For local development without Compose, set `ConnectionStrings__HelpDesk` and `Jwt__SigningKey` (or use .NET user-secrets), then run `dotnet tool restore` and `dotnet ef database update` before starting the API.
-
-### First admin
-
-In the Compose Development setup, set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_FULL_NAME`, and `BOOTSTRAP_ADMIN_PASSWORD` in `.env` before the first API start. Bootstrap creates the account only when absent. Remove the bootstrap password from `.env` after startup. For local `dotnet run`, set the corresponding `BootstrapAdmin__...` environment variables or user-secrets. Bootstrap is disabled outside Development. Further accounts are created by an Admin using `POST /api/users`; public registration is disabled.
-
-### Migrations
-
-Migrations are deliberately not run implicitly in production. For a reviewed deployment, back up the database, inspect pending migrations, then apply them as a separate release operation using the migration profile (or `dotnet ef database update` from a trusted SDK environment). The profile uses the same multi-stage Dockerfile and configured database connection:
-
-```sh
-docker compose --profile migration run --rm migrate
-```
-
-To create a migration locally after changing the model:
-
-```sh
-dotnet tool restore
-dotnet ef migrations add DescribeChange
-dotnet ef database update
-```
-
-Do not run migration commands against a production database without the deployment's normal review and backup process.
-
-## Run and test
-
-```sh
-dotnet restore HelpDesk.sln
-dotnet build HelpDesk.sln
-dotnet test HelpDesk.sln
-dotnet run --project HelpDesk.Api.csproj
-```
-
-The test suite uses unit tests and PostgreSQL 17 Testcontainers integration tests. Tests need a working Docker daemon; when unavailable, integration tests report framework-level skips with a reason. No personal database credentials are required.
-
-## API examples
-
-Login:
-
-```sh
-curl -s http://localhost:8080/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@company.example","password":"your-local-admin-password"}'
-```
-
-Create a ticket with the returned access token:
-
-```sh
-curl -i http://localhost:8080/api/tickets \
-  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"VPN connection issue","description":"Unable to connect to the company VPN.","priority":"High","categoryId":2}'
-```
-
-List tickets with filters and pagination:
-
-```sh
-curl 'http://localhost:8080/api/tickets?status=Open&page=1&pageSize=20' \
-  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN'
-```
-
-In Swagger UI, call `POST /api/auth/login`, copy `accessToken`, click **Authorize**, and paste only the token value (do not prepend `Bearer `). The OpenAPI scheme is HTTP bearer, so Swagger adds the `Bearer` prefix to the request header. Tokens expire after 60 minutes.
-
-### Routes
+## Endpoints
 
 | Method | Route | Access |
 |---|---|---|
-| POST | `/api/auth/login` | Anonymous |
-| GET | `/api/users/me` | Authenticated |
+| POST | `/api/auth/login` | Anyone |
+| GET | `/api/users/me` | Logged in |
 | POST | `/api/users` | Admin |
-| GET | `/api/tickets` | Authenticated; Employees see their own |
-| GET | `/api/tickets/{id}` | Authenticated; Employee ownership enforced |
-| POST | `/api/tickets` | Authenticated; requester comes from token |
-| PUT | `/api/tickets/{id}` | Employee-owned update; Agent/Admin may update any |
-| DELETE | `/api/tickets/{id}` | Agent/Admin |
-| GET/POST | `/api/tickets/{id}/comments` | Authenticated; internal notes Agent/Admin only |
-| PUT | `/api/tickets/{id}/assignment` | Agent/Admin |
-| GET | `/api/categories`, `/api/departments` | Authenticated |
+| GET, POST | `/api/tickets` | Logged in (employees see only their own) |
+| GET, PUT | `/api/tickets/{id}` | Owner, Agent, Admin |
+| DELETE | `/api/tickets/{id}` | Agent, Admin |
+| GET, POST | `/api/tickets/{id}/comments` | Logged in (internal notes: Agent, Admin) |
+| PUT | `/api/tickets/{id}/assignment` | Agent, Admin |
+| GET | `/api/categories`, `/api/departments` | Logged in |
 | POST | `/api/categories`, `/api/departments` | Admin |
 
-Ticket listing supports status, priority, category, requester, assignee, created date range, text search, allow-listed sorting, and pagination (default 20, maximum 100).
+Ticket lists support filters (status, priority, category, requester, assignee, dates), text search, sorting and pagination (default 20, max 100). Public registration is disabled: an Admin creates users with `POST /api/users`.
+
+## Run without Docker
+
+You need the .NET 10 SDK and a PostgreSQL 17 database.
+
+```sh
+dotnet user-secrets init
+dotnet user-secrets set "ConnectionStrings:HelpDesk" "Host=localhost;Port=5432;Database=helpdesk;Username=helpdesk;Password=<db-password>"
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)"
+dotnet user-secrets set "BootstrapAdmin:Email" "admin@company.example"
+dotnet user-secrets set "BootstrapAdmin:FullName" "Help Desk Administrator"
+dotnet user-secrets set "BootstrapAdmin:Password" "<12+ character password>"
+
+dotnet tool restore
+dotnet ef database update
+dotnet run
+```
+
+The port comes from `Properties/launchSettings.json` (for example 5091). The first admin is created automatically in Development only.
+
+## Tests
+
+```sh
+dotnet test HelpDesk.sln
+```
+
+Unit tests cover the workflow rules, password hashing and JWT. Integration tests run the real API against PostgreSQL 17 started by Testcontainers, so Docker must be running (otherwise they are reported as skipped). GitHub Actions runs the same tests on every push.
 
 ## Design decisions
 
-- Categories and departments are relational lookup tables because tickets and users reference them.
-- Enums are stored as readable strings in PostgreSQL; `TicketWorkflow` centralizes valid status changes.
-- Ticket ownership is applied in database queries. Returning `404` for another employee's ticket avoids disclosing that it exists.
-- `PasswordHasher<User>` supplies password hashing without Identity's larger account model; user creation is restricted to Admin and bootstrap is Development-only.
-- JWT validation checks issuer, audience, signature, and expiry. Signing keys are configuration secrets and must be at least 32 bytes.
-- Testcontainers exercises actual PostgreSQL behavior; Docker is required for those integration tests.
-- Compose uses PostgreSQL 17 and separates the migration job from API startup. The migration profile is opt-in and intended to make schema changes a deliberate release action.
+- **`404` for other people's tickets**, so the API doesn't reveal which tickets exist.
+- **Identity comes from the token**: ticket requester and comment author are never read from the request body.
+- **Status changes go through one workflow class** (`TicketWorkflow`).
+- **Migrations are a separate step**, not run at API startup, so schema changes are deliberate.
+- **Testcontainers instead of an in-memory database**, so tests use real PostgreSQL behavior.
+- **`PasswordHasher<User>`** for password hashing, without the full ASP.NET Core Identity model.
 
 ## Known limitations
 
-This portfolio project is not production ready. It does not provide refresh tokens, password reset or lockout flows, audit history, operational key rotation, production admin provisioning, rate limiting, or deployment-specific secret management. The Development bootstrap credentials must be removed after initial setup. HTTPS termination and operational monitoring are deployment responsibilities.
+A portfolio project, not production ready: no refresh tokens, password reset, rate limiting, audit history or key rotation. Remove the bootstrap admin password after first setup. HTTPS and monitoring are left to the deployment.
+
+## Development notes
+
+Built in stages with OpenAI Codex as a coding assistant, following the roadmap in [AGENTS.md](AGENTS.md). I set the scope and design decisions, reviewed each stage and tested the API manually.
