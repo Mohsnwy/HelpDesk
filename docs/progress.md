@@ -1,78 +1,27 @@
 # Implementation progress
 
-## Stage 1 — Audit and stabilize (baseline)
+Stages 1–8 were merged to `main` before work on `feature/stage-9`.
 
-- Confirmed target framework .NET 10 and retained ASP.NET Core controllers, Swagger, and OpenAPI.
-- Removed the unused WeatherForecast template endpoint and model.
-- Added this progress log and a root `.gitignore`.
-- The repository is maintained in Git; the current feature branch is `feature/stage-6`.
+## Stages 1–8 — API foundation and functionality
 
-## Stage 2 — Ticket CRUD (baseline)
+- Stabilized the .NET 10 ASP.NET Core API; implemented ticket CRUD, PostgreSQL persistence, EF Core migrations, validation, centralized ticket workflow, RFC 7807 errors, comments, assignment, filtering, sorting, and pagination.
+- Added category, department, and user endpoints; JWT login; password hashing; role-based access; Employee ownership enforcement and internal-comment privacy.
+- Added xUnit unit tests and PostgreSQL 17 Testcontainers integration coverage, including authentication and authorization behavior.
+- The API does not apply migrations at startup. Database migration is a deliberate operator action.
 
-- Implemented list, get, create, update, and delete routes with appropriate `200`, `201`, `204`, `400`, `404`, and `409` responses.
-- Added request and response DTOs, enum validation, generated database IDs, and server-managed UTC timestamps.
-- Added the status/priority enums and status transition checks.
+## Stage 9 — Portfolio readiness
 
-## Stage 3 — PostgreSQL and EF Core (baseline)
+- Added a multi-stage .NET 10 Dockerfile, PostgreSQL 17 Compose stack, persistent database volume, health check, and an opt-in migration profile. The API container never applies migrations implicitly.
+- Added `.env.example` with placeholders and ignored local `.env` files; expanded `.gitignore` and added `.dockerignore` to keep local configuration, build output, and test artifacts out of images and Git.
+- Added GitHub Actions CI to restore, build, and test on .NET 10. GitHub-hosted Ubuntu runners provide Docker for Testcontainers; the workflow uses read-only repository permissions and no credentials.
+- Reworked the README with setup, configuration, first-admin bootstrap, migrations, API usage, design decisions, and limitations. Confirmed the Swagger OpenAPI definition uses HTTP bearer authentication; users paste only the JWT and Swagger constructs the `Bearer` header.
+- `dotnet build HelpDesk.sln --configuration Release -m:1`: succeeded with 0 warnings and 0 errors.
+- `dotnet test HelpDesk.sln --configuration Release --no-build -m:1`: 21 passed, 0 failed, 0 skipped. PostgreSQL Testcontainers ran successfully using Docker.
+- `docker compose --env-file .env.example config --quiet`: succeeded.
+- `docker build --target runtime -t helpdesk-api:stage-9 .`: succeeded.
+- `docker build --target migration -t helpdesk-api-migrations:stage-9 .`: succeeded; the EF CLI tool restored successfully.
 
-- Added EF Core 10 and Npgsql 10, the domain entities, explicit relationships, length constraints, indexes, enum string conversions, and lookup seed data.
-- Added the PostgreSQL DbContext, design-time factory, initial migration, and local EF CLI manifest.
-- The design-time factory loads the same environment-specific appsettings and environment variables as the API.
-- Connection configuration comes from `ConnectionStrings:HelpDesk` / `ConnectionStrings__HelpDesk`; no real credentials are stored in the repository.
-- The supplied local database already had both migrations recorded. `dotnet ef database update` confirmed it was current and applied no changes.
+## Remaining limitations
 
-## Stage 4 — Testing foundation (baseline)
-
-- Added xUnit unit tests for allowed and rejected workflow transitions.
-- Added a `WebApplicationFactory` CRUD integration test using PostgreSQL Testcontainers, including validation, not-found behavior, location header, and invalid transition coverage.
-- The PostgreSQL integration tests use Testcontainers and report a framework-level skipped result when Docker is unavailable.
-
-## Stage 5 — Architecture and error handling (baseline; test catch-up committed before Stage 6)
-
-- Added `ITicketService` / `TicketService`, asynchronous EF operations, centralized status workflow, and generic RFC 7807 exception handling.
-- Added catch-up coverage for TicketService persistence/mapping, generic exception responses without leaked details, and request validation.
-
-## Pre-Stage-6 verification
-
-- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
-- `dotnet test HelpDesk.sln --no-restore -m:1`: 13 passed, 0 failed, 0 skipped. PostgreSQL Testcontainers ran successfully against `postgres:17`.
-- `dotnet list HelpDesk.sln package --vulnerable --include-transitive`: no vulnerable packages found in the configured NuGet source.
-- The existing local PostgreSQL container is reachable at `localhost:5432`; `GET /api/tickets` returned `200` with an empty list.
-- `dotnet ef database update` connected successfully and reported the local database was already up to date.
-
-## Stage 6 — Comments and API usability
-
-- Added comment list/create routes with `IsInternal`, active author validation, required body validation, and stable chronological ordering.
-- Added assignment/unassignment; only active Agent/Admin users are accepted as assignees.
-- Added combined status, priority, category, requester, assignee, date-range, and case-insensitive text filters; allow-listed stable sorting; page metadata; and page-size/page-number/filter validation.
-- Added endpoint summaries, remarks, response metadata, request examples, and documented current unauthenticated limitations.
-- Added PostgreSQL HTTP integration coverage for comments, assignment, filtering, sorting, pagination, invalid bounds, empty results, and invalid comment/assignee inputs.
-- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
-- `dotnet test HelpDesk.sln --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; the PostgreSQL 17 Testcontainers integration test ran successfully.
-
-## Stage 7 — Users and departments
-
-- Added sorted category and department list endpoints and creation endpoints, plus user profile/admin-creation route scaffolding and credential-free user response DTOs.
-- Added the required user password-hash column and EF migration; passwords will be hashed with `PasswordHasher<User>` as part of Stage 8.
-- Kept categories and departments as lookup entities because ticket and employee records reference them relationally.
-- Added PostgreSQL HTTP coverage for lookup reads, creates, and request validation.
-- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
-- `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 13 passed, 0 failed, 0 skipped; PostgreSQL Testcontainers ran successfully.
-
-## Stage 8 — Authentication and authorization
-
-- Added JWT bearer login with issuer, audience, signature, and expiry validation; signing key is required and at least 32 bytes outside the test environment.
-- Added PasswordHasher-backed admin user creation, authenticated profile lookup, and Development-only first-admin bootstrap from configuration.
-- Enforced Employee ticket ownership and `404` concealment; hid internal comments from Employees; assigned requester and comment author from JWT identity; restricted assignment and internal notes to Agent/Admin.
-- Protected lookup reads for authenticated users and lookup writes for Admin. Added Swagger bearer authorization and updated the `.http` examples and README bootstrap/login instructions.
-- Added integration coverage for login success/failure, 401/403, user creation/profile, token validation, ownership, identity spoofing, and internal-comment visibility.
-- `dotnet build HelpDesk.sln --no-restore -m:1`: succeeded with 0 warnings and 0 errors.
-- A follow-up test commit adds six separately reported Stage 7/8 PostgreSQL API tests and two unit tests for password hashing and JWT signing/claims/expiry. The integration tests each use an isolated PostgreSQL 17 Testcontainer and known seed state.
-- `dotnet test HelpDesk.sln --no-build --no-restore -m:1`: 21 passed, 0 failed, 0 skipped; PostgreSQL 17 Testcontainers ran successfully.
-
-## Remaining roadmap
-
-- Stage 7: category/department endpoints and user profile support.
-- Stage 8: authentication and role/ownership authorization.
-- Stage 9: Docker Compose, CI, and portfolio documentation refinements.
-- The current unauthenticated API is for local development only.
+- The API has no refresh tokens, password recovery or lockout flows, audit history, automated key rotation, or production admin provisioning.
+- Production HTTPS termination, monitoring, secret storage, database backup, and migration approval remain deployment responsibilities.
