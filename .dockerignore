@@ -1,0 +1,14 @@
+.git
+.github
+.vs
+.vscode
+.idea
+**/bin
+**/obj
+**/TestResults
+**/.DS_Store
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+secrets.json
